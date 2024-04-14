@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import { buildURL } from '$lib';
+	import { dndzone } from 'svelte-dnd-action';
 
 	interface Video {
 		id: string;
@@ -87,6 +87,10 @@
 			publishAt: x.status.publishAt
 		}));
 	}
+
+	function handleDnd(e: any) {
+		videos = e.detail.items;
+	}
 </script>
 
 {#if accessToken === undefined}
@@ -95,7 +99,7 @@
 	{#await fetchVideos()}
 		Loading videos...
 	{:then}
-		<ul>
+		<ul use:dndzone={{ items: videos }} onconsider={handleDnd} onfinalize={handleDnd}>
 			{#each videos as video (video.id)}
 				<li><img src={video.thumbnail} /> {video.name} - {video.publishAt ?? 'unscheduled'}</li>
 			{/each}
