@@ -4,29 +4,22 @@
 	import { DateTime } from 'luxon';
 	import { fetchVideos, type Video } from './api';
 
-	interface Schedule {
-		timeOfDay: DateTime;
-		periodInDays: number;
-	}
-
-	interface Videos {
-		unscheduled: Video[];
-		aperiodic: Video[];
-		periodic: Video[];
-	}
+	type Track =
+		| {
+				kind: 'unscheduled' | 'aperiodic';
+				videos: Video[];
+		  }
+		| {
+				kind: 'periodic';
+				videos: Video[];
+				schedule: {
+					timeOfDay: DateTime;
+					periodInDays: number;
+				};
+		  };
 
 	let accessToken = $state<string>();
-	let videos = $state<Videos>({ unscheduled: [], aperiodic: [], periodic: [] });
-	let schedule = $state<Schedule>({
-		timeOfDay: DateTime.fromISO('2000-01-01T09:00:00'),
-		periodInDays: 2
-	});
-
-	const titles = $derived({
-		unscheduled: 'Unscheduled',
-		aperiodic: 'Aperiodic',
-		periodic: `At ${schedule.timeOfDay.toLocaleString(DateTime.DATETIME_SHORT)} and then every ${schedule.periodInDays === 1 ? 'day' : `${schedule.periodInDays} days`}`
-	});
+	let tracks = $state<Track[]>([]);
 
 	function login() {
 		const queryParams = {
@@ -54,26 +47,39 @@
 
 	async function fetchVideosEffect() {
 		const _videos = await fetchVideos(accessToken!);
-		videos = {
-			unscheduled: _videos.filter((x) => x.clientPublishAt === undefined),
-			aperiodic: toSortedVideos(_videos.filter((x) => x.clientPublishAt !== undefined)),
-			periodic: []
-		};
+		tracks = [
+			{ kind: 'unscheduled', videos: _videos.filter((x) => x.clientPublishAt === undefined) },
+			{
+				kind: 'aperiodic',
+				videos: toSortedVideos(_videos.filter((x) => x.clientPublishAt !== undefined))
+			}
+		];
 	}
 
 	function toSortedVideos(x: Video[]): Video[] {
 		return x.toSorted((a, b) => a.clientPublishAt!.toSeconds() - b.clientPublishAt!.toSeconds());
 	}
 
-	function handleDnd(track: keyof Videos) {
+	function handleDnd(track: Track) {
 		return function handleDnd(e: any) {
-			videos[track] = track === 'aperiodic' ? toSortedVideos(e.detail.items) : e.detail.items;
+			track.videos = track.kind === 'aperiodic' ? toSortedVideos(e.detail.items) : e.detail.items;
 		};
 	}
 
 	function formatDate(x: DateTime | undefined) {
 		if (x === undefined) return '';
 		return x.setZone('system').toLocaleString(DateTime.DATETIME_SHORT);
+	}
+
+	function getTrackTitle(x: Track) {
+		switch (x.kind) {
+			case 'unscheduled':
+				return 'Unscheduled';
+			case 'aperiodic':
+				return 'Aperiodic';
+			case 'periodic':
+				return `At ${formatDate(x.schedule.timeOfDay)}, then every ${x.schedule.periodInDays === 1 ? 'day' : `${x.schedule.periodInDays} days`}`;
+		}
 	}
 </script>
 
@@ -84,15 +90,18 @@
 		Loading videos...
 	{:then}
 		<div class="tracks">
-			{#each ["unscheduled", "aperiodic", "periodic"] as const as track}
+			{#each tracks as track}
 				<div class="track">
-					{titles[track]}
+					{getTrackTitle(track)}
 					<ul
-						use:dndzone={{ items: videos[track], dropFromOthersDisabled: track === 'aperiodic' }}
+						use:dndzone={{
+							items: track.videos,
+							dropFromOthersDisabled: track.kind === 'aperiodic'
+						}}
 						onconsider={handleDnd(track)}
 						onfinalize={handleDnd(track)}
 					>
-						{#each videos[track] as video (video.id)}
+						{#each track.videos as video (video.id)}
 							<li class="video">
 								<img src={video.thumbnail} />
 								<div class="video-props">
