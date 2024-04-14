@@ -1,6 +1,7 @@
 // place files you want to import through the `$lib` alias in this folder.
 
-export const buildURL = (base: string, obj: Record<string,string>) =>
+export const buildURL = (base: string, obj: Record<string,string | undefined>) =>
     `${base}?${Object.entries(obj)
-          .map(pair => pair.map(encodeURIComponent).join('='))
+          .filter(pair => pair[1] !== undefined)
+          .map(pair => (pair as string[]).map(encodeURIComponent).join('='))
           .join('&')}`;
