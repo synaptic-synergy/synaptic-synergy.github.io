@@ -31,6 +31,8 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@types/luxon": "^3.4.2",
+		"luxon": "^3.4.4",
 		"svelte-dnd-action": "^0.9.43"
 	}
 }

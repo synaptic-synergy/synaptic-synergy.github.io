@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { buildURL } from '$lib';
 	import { dndzone } from 'svelte-dnd-action';
+	import { DateTime } from 'luxon';
+	import { fetchVideos, type Video } from './api';
 
-	interface Video {
-		id: string;
-		name: string;
-		thumbnail: string;
-		publishAt: string;
+	interface Track {
+		kind: 'unscheduled' | 'aperiodic' | 'periodic' | 'new';
+		videos: Video[];
 	}
 
 	let accessToken = $state<string>();
-	let videos = $state<Video[]>([]);
+	let tracks = $state<Track[]>([]);
 
 	function login() {
 		const queryParams = {
@@ -36,79 +36,61 @@
 		}
 	});
 
-	async function fetchAll(resource: string, opts: Record<string, string>) {
-		let pageToken = undefined;
-		const res: any[] = [];
-		while (true) {
-			let resp: any = await (
-				await fetch(
-					buildURL(`https://www.googleapis.com/youtube/v3/${resource}`, {
-						...opts,
-						access_token: accessToken!,
-						maxResults: '50',
-						pageToken
-					})
-				)
-			).json();
-			pageToken = resp.nextPageToken;
-			res.push(...resp.items);
-			if (pageToken === undefined) break;
-		}
-		return res;
+	async function fetchVideosEffect() {
+		const videos = await fetchVideos(accessToken!);
+		tracks = [
+			{ kind: 'unscheduled', videos: videos.filter((x) => x.clientPublishAt === undefined) },
+			{ kind: 'aperiodic', videos: videos.filter((x) => x.clientPublishAt !== undefined) },
+			{ kind: 'new', videos: [] }
+		];
 	}
 
-	async function fetchVideos() {
-		const channel = (
-			await fetchAll('channels', {
-				part: 'snippet,contentDetails',
-				mine: 'true'
-			})
-		)[0];
-		const uploadedPlaylist = channel.contentDetails.relatedPlaylists.uploads;
-		const videoIds = (
-			await fetchAll('playlistItems', {
-				part: 'snippet,status',
-				playlistId: uploadedPlaylist
-			})
-		)
-			.filter(
-				(x) => x.status.privacyStatus === 'private' && x.snippet.resourceId.kind === 'youtube#video'
-			)
-			.map((x) => x.snippet.resourceId.videoId);
-		videos = (
-			await fetchAll('videos', {
-				part: 'snippet,status',
-				id: videoIds.join(',')
-			})
-		).map((x) => ({
-			id: x.id,
-			name: x.snippet.title,
-			thumbnail: x.snippet.thumbnails.default.url,
-			publishAt: x.status.publishAt
-		}));
+	function handleDnd(index: number) {
+		return function handleDnd(e: any) {
+			tracks[index].videos = e.detail.items;
+		};
 	}
 
-	function handleDnd(e: any) {
-		videos = e.detail.items;
+	function formatDate(x: DateTime | undefined) {
+		if (x === undefined) return '';
+		return x.setZone('system').toLocaleString(DateTime.DATETIME_SHORT);
 	}
 </script>
 
 {#if accessToken === undefined}
 	Redirecting to login page...
 {:else}
-	{#await fetchVideos()}
+	{#await fetchVideosEffect()}
 		Loading videos...
 	{:then}
-		<ul use:dndzone={{ items: videos }} onconsider={handleDnd} onfinalize={handleDnd}>
-			{#each videos as video (video.id)}
-				<li><img src={video.thumbnail} /> {video.name} - {video.publishAt ?? 'unscheduled'}</li>
+		<div class="tracks">
+			{#each tracks as track, trackIndex (trackIndex)}
+				<div class="track">
+					{track.kind}
+					<ul
+						use:dndzone={{ items: track.videos }}
+						onconsider={handleDnd(trackIndex)}
+						onfinalize={handleDnd(trackIndex)}
+					>
+						{#each track.videos as video (video.id)}
+							<li>
+								<img src={video.thumbnail} />
+								{video.name} - {formatDate(video.clientPublishAt)}
+							</li>
+						{/each}
+					</ul>
+				</div>
 			{/each}
-		</ul>
+		</div>
 	{/await}
 {/if}
 
 <style>
 	li img {
 		vertical-align: middle;
+	}
+
+	.tracks {
+		display: flex;
 	}
 </style>
