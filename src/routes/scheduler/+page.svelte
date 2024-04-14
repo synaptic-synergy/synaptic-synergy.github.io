@@ -93,9 +93,12 @@
 						onfinalize={handleDnd(track)}
 					>
 						{#each videos[track] as video (video.id)}
-							<li>
+							<li class="video">
 								<img src={video.thumbnail} />
-								{video.name} - {formatDate(video.clientPublishAt)}
+								<div class="video-props">
+									<div class="video-title">{video.name}</div>
+									<div class="video-publishAt">{formatDate(video.clientPublishAt)}</div>
+								</div>
 							</li>
 						{/each}
 					</ul>
@@ -106,11 +109,33 @@
 {/if}
 
 <style>
+	ul {
+		list-style-type: none;
+		padding-left: 0;
+	}
 	li img {
 		vertical-align: middle;
+		width: 120px;
+		height: 66px;
+		object-fit: cover;
 	}
 
 	.tracks {
 		display: flex;
+	}
+
+	.video {
+		border-radius: 16px;
+		border: solid 1px rgb(235, 235, 235);
+		margin: 4px;
+		padding: 8px;
+		width: 400px;
+		display: flex;
+	}
+	.video-props {
+		padding: 8px;
+	}
+	.video-title {
+		font-weight: bold;
 	}
 </style>
