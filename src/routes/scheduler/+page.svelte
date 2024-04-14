@@ -2,7 +2,7 @@
 	import { buildURL } from '$lib';
 	import { dndzone } from 'svelte-dnd-action';
 	import { DateTime } from 'luxon';
-	import { fetchVideos, type Video } from './api';
+	import { fetchVideos, updateVideo, type Video } from './api';
 
 	type Track =
 		| {
@@ -13,7 +13,7 @@
 				kind: 'periodic';
 				videos: Video[];
 				schedule: {
-					timeOfDay: DateTime;
+					start: DateTime;
 					periodInDays: number;
 				};
 		  };
@@ -60,9 +60,25 @@
 		return x.toSorted((a, b) => a.clientPublishAt!.toSeconds() - b.clientPublishAt!.toSeconds());
 	}
 
-	function handleDnd(track: Track) {
+	function handleDnd(track: Track, persist: boolean) {
 		return function handleDnd(e: any) {
 			track.videos = track.kind === 'aperiodic' ? toSortedVideos(e.detail.items) : e.detail.items;
+			if (track.kind === 'periodic') {
+				track.videos.forEach((x, i) => {
+					x.clientPublishAt = track.schedule.start.plus({ days: track.schedule.periodInDays * i });
+				});
+			}
+			if (track.kind === 'unscheduled') {
+				track.videos.forEach((x) => {
+					x.clientPublishAt = undefined;
+				});
+			}
+			track.videos.forEach((x) => {
+				if (persist && x.clientPublishAt?.toMillis() !== x.serverPublishAt?.toMillis()) {
+					updateVideo(accessToken!, x);
+					x.serverPublishAt = x.clientPublishAt;
+				}
+			});
 		};
 	}
 
@@ -78,8 +94,19 @@
 			case 'aperiodic':
 				return 'Aperiodic';
 			case 'periodic':
-				return `At ${formatDate(x.schedule.timeOfDay)}, then every ${x.schedule.periodInDays === 1 ? 'day' : `${x.schedule.periodInDays} days`}`;
+				return `At ${formatDate(x.schedule.start)}, then every ${x.schedule.periodInDays === 1 ? 'day' : `${x.schedule.periodInDays} days`}`;
 		}
+	}
+
+	function addTrack() {
+		tracks.push({
+			kind: 'periodic',
+			videos: [],
+			schedule: {
+				periodInDays: 1,
+				start: DateTime.now().plus({ days: 100 })
+			}
+		});
 	}
 </script>
 
@@ -92,20 +119,20 @@
 		<div class="tracks">
 			{#each tracks as track}
 				<div class="track">
-					{getTrackTitle(track)}
+					<div class="title">{getTrackTitle(track)}</div>
 					<ul
 						use:dndzone={{
 							items: track.videos,
 							dropFromOthersDisabled: track.kind === 'aperiodic'
 						}}
-						onconsider={handleDnd(track)}
-						onfinalize={handleDnd(track)}
+						onconsider={handleDnd(track, false)}
+						onfinalize={handleDnd(track, true)}
 					>
 						{#each track.videos as video (video.id)}
 							<li class="video">
 								<img src={video.thumbnail} />
 								<div class="video-props">
-									<div class="video-title">{video.name}</div>
+									<div class="title">{video.name}</div>
 									<div class="video-publishAt">{formatDate(video.clientPublishAt)}</div>
 								</div>
 							</li>
@@ -113,6 +140,7 @@
 					</ul>
 				</div>
 			{/each}
+			<div><button onclick={addTrack}>Add track</button></div>
 		</div>
 	{/await}
 {/if}
@@ -121,6 +149,7 @@
 	ul {
 		list-style-type: none;
 		padding-left: 0;
+		min-height: 200px;
 	}
 	li img {
 		vertical-align: middle;
@@ -132,19 +161,21 @@
 	.tracks {
 		display: flex;
 	}
+	.track {
+		width: 400px;
+	}
 
 	.video {
 		border-radius: 16px;
 		border: solid 1px rgb(235, 235, 235);
 		margin: 4px;
 		padding: 8px;
-		width: 400px;
 		display: flex;
 	}
 	.video-props {
 		padding: 8px;
 	}
-	.video-title {
+	.title {
 		font-weight: bold;
 	}
 </style>

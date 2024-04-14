@@ -81,7 +81,7 @@ export function updateVideo(accessToken: string, video: Video) {
 				status: {
 					...video.status,
 					publishAt: video.clientPublishAt?.toISO(),
-					privacyStatus: video.clientPublishAt === undefined ? undefined : 'private'
+					privacyStatus: 'private'
 				}
 			})
 		}
