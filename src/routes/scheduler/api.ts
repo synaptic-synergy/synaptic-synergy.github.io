@@ -1,6 +1,20 @@
 import { buildURL } from '$lib';
 import { DateTime } from 'luxon';
 
+export type Track =
+	| {
+			kind: 'unscheduled' | 'aperiodic';
+			videos: Video[];
+	  }
+	| {
+			kind: 'periodic';
+			videos: Video[];
+			schedule: {
+				start: DateTime;
+				periodInDays: number;
+			};
+	  };
+
 export interface Video {
 	id: string;
 	name: string;
@@ -8,6 +22,33 @@ export interface Video {
 	status: any;
 	serverPublishAt: DateTime | undefined;
 	clientPublishAt: DateTime | undefined;
+}
+
+export function cloneVideo(x: Video): Video {
+	return { ...x };
+}
+export function cloneTrack(x: Track): Track {
+	return {
+		kind: x.kind,
+		schedule: { ...(x as any).schedule },
+		videos: x.videos.map((x) => ({
+			...x,
+			status: { ...x.status },
+			serverPublishAt:
+				x.serverPublishAt === undefined ? undefined : DateTime.fromISO(x.serverPublishAt.toISO()!),
+			clientPublishAt:
+				x.clientPublishAt === undefined ? undefined : DateTime.fromISO(x.clientPublishAt.toISO()!)
+		}))
+	};
+}
+
+export function toSortedVideos(x: Video[]): Video[] {
+	return x.toSorted((a, b) => a.clientPublishAt!.toSeconds() - b.clientPublishAt!.toSeconds());
+}
+
+export function formatDate(x: DateTime | undefined) {
+	if (x === undefined) return '';
+	return x.setZone('system').toLocaleString(DateTime.DATETIME_SHORT);
 }
 
 export async function fetchAll(resource: string, opts: Record<string, string>) {
