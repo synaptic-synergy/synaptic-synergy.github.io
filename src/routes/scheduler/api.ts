@@ -30,22 +30,14 @@ export interface Video {
 	clientPublishAt: DateTime | undefined;
 }
 
-export function cloneVideo(x: Video): Video {
-	return { ...x };
-}
-export function cloneTrack(x: Track): Track {
-	return {
-		kind: x.kind,
-		schedule: { ...(x as any).schedule },
-		videos: x.videos.map((x) => ({
-			...x,
-			status: { ...x.status },
-			serverPublishAt:
-				x.serverPublishAt === undefined ? undefined : DateTime.fromISO(x.serverPublishAt.toISO()!),
-			clientPublishAt:
-				x.clientPublishAt === undefined ? undefined : DateTime.fromISO(x.clientPublishAt.toISO()!)
-		}))
+export function login() {
+	const queryParams = {
+		client_id: '163691415601-9dkcmmbel076laqtobf51j29u4nduq3a.apps.googleusercontent.com',
+		redirect_uri: location.href,
+		response_type: 'token',
+		scope: 'https://www.googleapis.com/auth/youtube'
 	};
+	location.href = buildURL(`https://accounts.google.com/o/oauth2/v2/auth`, queryParams);
 }
 
 export function toSortedVideos(x: Video[]): Video[] {

@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { buildURL, range } from '$lib';
+	import { range } from '$lib';
 	import { DateTime } from 'luxon';
 	import {
+		login,
 		fetchVideos,
 		updateVideo,
 		type Track,
@@ -11,18 +12,9 @@
 	} from './api';
 	import TrackComponent from './TrackComponent.svelte';
 
+	let isError = $state(false);
 	let accessToken = $state<string>();
 	let tracks = $state<Track[]>([]);
-
-	function login() {
-		const queryParams = {
-			client_id: '163691415601-9dkcmmbel076laqtobf51j29u4nduq3a.apps.googleusercontent.com',
-			redirect_uri: window.location.href,
-			response_type: 'token',
-			scope: 'https://www.googleapis.com/auth/youtube'
-		};
-		window.location.href = buildURL(`https://accounts.google.com/o/oauth2/v2/auth`, queryParams);
-	}
 
 	$effect(() => {
 		var params: Record<string, string> = {};
@@ -31,10 +23,26 @@
 		while ((m = regex.exec(location.hash.substring(1)))) {
 			params[decodeURIComponent(m[1])] = decodeURIComponent(m[2]);
 		}
-		if ('access_token' in params) {
-			accessToken = params.access_token;
+
+		if ('error' in params) {
+			isError = true;
 		} else {
-			login();
+			let expiration = 0;
+			if ('access_token' in params) {
+				accessToken = params.access_token;
+				expiration = Date.now() + Number(params.expires_in ?? 3599) * 1000;
+				sessionStorage.setItem('token', accessToken);
+				sessionStorage.setItem('expiration', expiration.toString());
+			} else {
+				accessToken = sessionStorage.getItem('token') ?? undefined;
+				expiration = Number(sessionStorage.getItem('expiration') ?? 0);
+			}
+
+			setTimeout(() => login(), Math.max(0, expiration - Date.now()));
+		}
+		location.replace('#');
+		if (typeof history.replaceState == 'function') {
+			history.replaceState({}, '', location.href.slice(0, -1));
 		}
 	});
 
@@ -42,8 +50,7 @@
 		for (const track of tracks) {
 			for (const video of track.videos) {
 				if (video.clientPublishAt?.toMillis() !== video.serverPublishAt?.toMillis()) {
-					//updateVideo(accessToken!, video);
-					console.log('Updating', video.name);
+					updateVideo(accessToken!, video);
 					video.serverPublishAt = video.clientPublishAt;
 				}
 			}
@@ -142,7 +149,9 @@
 	}
 </script>
 
-{#if accessToken === undefined}
+{#if isError}
+	Authorization error
+{:else if accessToken === undefined}
 	Redirecting to login page...
 {:else}
 	{#await fetchVideosEffect()}
