@@ -121,7 +121,7 @@ export function updateVideo(accessToken: string, video: Video) {
 				id: video.id,
 				status: {
 					...video.status,
-					publishAt: video.clientPublishAt?.toISO(),
+					publishAt: video.clientPublishAt?.toUTC().toISO(),
 					privacyStatus: 'private'
 				}
 			})

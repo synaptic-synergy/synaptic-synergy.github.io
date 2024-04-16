@@ -4,35 +4,30 @@
 	import { dndzone } from 'svelte-dnd-action';
 
 	let { track = $bindable() }: { track: Track } = $props();
-	let _track = $state<Track>(cloneTrack(track));
+	let _track = $state<Track>($state.snapshot(track));
 	$effect(() => {
-		_track = cloneTrack(track);
+		_track = $state.snapshot(track);
 	});
 
 	function updatePublishAts() {
-		const __track = cloneTrack(_track);
-		__track.videos.forEach((x, i) => {
-			if (__track.kind === 'periodic') {
-				x.clientPublishAt = __track.schedule.start.plus({
-					days: __track.schedule.periodInDays * i
+		_track.videos.forEach((x, i) => {
+			if (_track.kind === 'periodic') {
+				x.clientPublishAt = _track.schedule.start.plus({
+					days: _track.schedule.periodInDays * i
 				});
 			}
-			if (__track.kind === 'unscheduled') {
+			if (_track.kind === 'unscheduled') {
 				x.clientPublishAt = undefined;
 			}
 		});
-		_track = __track;
 	}
 
 	function handleDnd(persist: boolean) {
 		return function handleDnd(e: any) {
-			_track = {
-				...track,
-				videos: _track.kind === 'aperiodic' ? toSortedVideos(e.detail.items) : e.detail.items
-			};
-			updatePublishAts();
+			_track.videos = _track.kind === 'aperiodic' ? toSortedVideos(e.detail.items) : e.detail.items;
 			if (persist) {
-				track = cloneTrack(_track);
+				updatePublishAts();
+				track = $state.snapshot(_track);
 			}
 		};
 	}
@@ -49,20 +44,7 @@
 				});
 		},
 		set value(val) {
-			const __track = cloneTrack(_track);
-			(__track as any).schedule.start = DateTime.fromISO(val);
-			_track = __track;
-		}
-	};
-
-	const period = {
-		get value() {
-			return (_track as any).schedule.periodInDays;
-		},
-		set value(val) {
-			const __track = cloneTrack(_track);
-			(__track as any).schedule.periodInDays = val;
-			_track = __track;
+			(_track as any).schedule.start = DateTime.fromISO(val);
 		}
 	};
 </script>
@@ -76,7 +58,7 @@
 				type="number"
 				min="1"
 				max="14"
-				bind:value={period.value}
+				bind:value={_track.schedule.periodInDays}
 				oninput={updatePublishAts}
 				style="width: 32px"
 			/>
