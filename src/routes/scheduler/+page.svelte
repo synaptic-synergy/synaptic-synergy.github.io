@@ -27,18 +27,19 @@
 		if ('error' in params) {
 			isError = true;
 		} else {
-			let expiration = 0;
 			if ('access_token' in params) {
-				accessToken = params.access_token;
-				expiration = Date.now() + Number(params.expires_in ?? 3599) * 1000;
-				sessionStorage.setItem('token', accessToken);
+				const expiration = Date.now() + Number(params.expires_in ?? 3599) * 1000;
+				sessionStorage.setItem('token', params.access_token);
 				sessionStorage.setItem('expiration', expiration.toString());
-			} else {
-				accessToken = sessionStorage.getItem('token') ?? undefined;
-				expiration = Number(sessionStorage.getItem('expiration') ?? 0);
 			}
 
-			setTimeout(() => login(), Math.max(0, expiration - Date.now()));
+			const storedAccessToken = sessionStorage.getItem('token') ?? undefined;
+			const expiration = Number(sessionStorage.getItem('expiration') ?? 0);
+
+			if (storedAccessToken !== undefined) {
+				setTimeout(() => login(), Math.max(0, expiration - Date.now()));
+			}
+			accessToken = storedAccessToken;
 		}
 		location.replace('#');
 		if (typeof history.replaceState == 'function') {
@@ -50,14 +51,12 @@
 		for (const track of tracks) {
 			for (const video of track.videos) {
 				if (video.clientPublishAt?.toMillis() !== video.serverPublishAt?.toMillis()) {
-					updateVideo(accessToken!, video);
+					updateVideo(accessToken!, $state.snapshot(video));
 					video.serverPublishAt = video.clientPublishAt;
 				}
 			}
 		}
 	});
-
-	$inspect(tracks);
 
 	$effect(() => {
 		if (tracks.length > 2 && tracks.at(-1)?.kind !== 'new')
@@ -72,14 +71,15 @@
 	});
 
 	async function fetchVideosEffect() {
-		let _videos = await fetchVideos(accessToken!);
+		let videos = await fetchVideos(accessToken!);
+		console.log(videos);
 		tracks = [
-			{ kind: 'unscheduled', videos: _videos.filter((x) => x.clientPublishAt === undefined) }
+			{ kind: 'unscheduled', videos: videos.filter((x) => x.clientPublishAt === undefined) }
 		];
-		_videos = toSortedVideos(_videos.filter((x) => x.clientPublishAt !== undefined));
+		videos = toSortedVideos(videos.filter((x) => x.clientPublishAt !== undefined));
 		while (true) {
-			const trackSuggestion = suggestTrack(_videos);
-			console.log(trackSuggestion);
+			const trackSuggestion = suggestTrack(videos);
+			console.log({ trackSuggestion });
 			if (
 				trackSuggestion === undefined ||
 				trackSuggestion.videos.length < (tracks.length === 1 ? 2 : 3)
@@ -87,11 +87,11 @@
 				break;
 			}
 			tracks.push(trackSuggestion);
-			_videos = _videos.filter((x) => !trackSuggestion.videos.includes(x));
+			videos = videos.filter((x) => !trackSuggestion.videos.includes(x));
 		}
 		tracks.splice(1, 0, {
 			kind: 'aperiodic',
-			videos: _videos
+			videos
 		});
 	}
 
@@ -147,12 +147,27 @@
 			)
 		};
 	}
+
+	function dummyLogin() {
+		accessToken = 'dummy';
+	}
 </script>
 
 {#if isError}
 	Authorization error
 {:else if accessToken === undefined}
-	Redirecting to login page...
+	<p>
+		Due to the quotas on YouTube API, I cannot just make this be publicly usable. You can try the
+		app with dummy data. If you are a youtuber, and would like to use this tool, contact me and I
+		will grant you access.
+	</p>
+	<p>
+		<button onclick={dummyLogin}>Try using dummy data</button>
+	</p>
+	{accessToken}
+	<p>
+		<button onclick={login}>Let me login, I was granted access</button>
+	</p>
 {:else}
 	{#await fetchVideosEffect()}
 		Loading videos...

@@ -1,5 +1,6 @@
 import { buildURL } from '$lib';
 import { DateTime } from 'luxon';
+import { getInitDummyState } from './initDummyState';
 
 export type TrackKind = 'unscheduled' | 'aperiodic' | 'new' | 'periodic';
 
@@ -35,7 +36,7 @@ export function login() {
 		client_id: '163691415601-9dkcmmbel076laqtobf51j29u4nduq3a.apps.googleusercontent.com',
 		redirect_uri: location.href,
 		response_type: 'token',
-		scope: 'https://www.googleapis.com/auth/youtube'
+		scope: 'https://www.googleapis.com/auth/youtube.force-ssl'
 	};
 	location.href = buildURL(`https://accounts.google.com/o/oauth2/v2/auth`, queryParams);
 }
@@ -70,6 +71,22 @@ export async function fetchAll(resource: string, opts: Record<string, string>) {
 }
 
 export async function fetchVideos(accessToken: string): Promise<Video[]> {
+	if (accessToken === 'dummy') {
+		const initDummyState = getInitDummyState();
+		let dummyState = JSON.parse(localStorage.getItem('dummyState') ?? '[]') as Video[];
+		if (dummyState.length < initDummyState.length - 3) {
+			dummyState = initDummyState;
+		}
+		localStorage.setItem('dummyState', JSON.stringify(dummyState));
+		dummyState.forEach((x) => {
+			x.clientPublishAt =
+				x.clientPublishAt == null ? undefined : DateTime.fromISO(x.clientPublishAt as any);
+			x.serverPublishAt =
+				x.serverPublishAt == null ? undefined : DateTime.fromISO(x.serverPublishAt as any);
+		});
+		return dummyState;
+	}
+
 	const channel = (
 		await fetchAll('channels', {
 			part: 'snippet,contentDetails',
@@ -108,6 +125,14 @@ export async function fetchVideos(accessToken: string): Promise<Video[]> {
 }
 
 export function updateVideo(accessToken: string, video: Video) {
+	if (accessToken === 'dummy') {
+		let dummyState = JSON.parse(localStorage.getItem('dummyState') ?? '[]') as Video[];
+		dummyState = dummyState.filter((x) => x.id !== video.id);
+		dummyState.push(video);
+		localStorage.setItem('dummyState', JSON.stringify(dummyState));
+		return {} as any;
+	}
+
 	return fetch(
 		buildURL('https://www.googleapis.com/youtube/v3/videos', {
 			part: 'status',
