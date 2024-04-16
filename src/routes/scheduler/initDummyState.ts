@@ -8,26 +8,26 @@ export function getInitDummyState(): Video[] {
 	return [
 		...range(5).map((x) => ({
 			id: `A${x}`,
-			name: `A ${x}`,
+			name: `Video - A ${x}`,
 			clientPublishAt: undefined,
 			serverPublishAt: undefined,
-			thumbnail: '',
+			thumbnail: `https://picsum.photos/seed/A${x}/120/90`,
 			status: {}
 		})),
 		...range(3).map((x) => ({
 			id: `B${x}`,
-			name: `B ${x}`,
+			name: `Video - B ${x}`,
 			clientPublishAt: base.plus({ hours: offsets[x] }),
 			serverPublishAt: base.plus({ hours: offsets[x] }),
-			thumbnail: '',
+			thumbnail: `https://picsum.photos/seed/B${x}/120/90`,
 			status: {}
 		})),
 		...range(5).map((x) => ({
 			id: `C${x}`,
-			name: `C ${x}`,
+			name: `Video - C ${x}`,
 			clientPublishAt: base.plus({ minutes: 90, days: x }),
 			serverPublishAt: base.plus({ minutes: 90, days: x }),
-			thumbnail: '',
+			thumbnail: `https://picsum.photos/seed/C${x}/120/90`,
 			status: {}
 		}))
 	];
