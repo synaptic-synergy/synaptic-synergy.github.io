@@ -9,7 +9,14 @@
 		_track = $state.snapshot(track);
 	});
 
-	function updatePublishAts() {
+	function updateTracks() {
+		if (_track.kind === 'new') {
+			_track.kind = 'periodic' as any;
+			(_track as Track as Track<'periodic'>).schedule = {
+				start: _track.videos[0].clientPublishAt ?? DateTime.now().plus({ days: 1 }),
+				periodInDays: 1
+			};
+		}
 		_track.videos.forEach((x, i) => {
 			if (_track.kind === 'periodic') {
 				x.clientPublishAt = _track.schedule.start.plus({
@@ -26,7 +33,7 @@
 		return function handleDnd(e: any) {
 			_track.videos = _track.kind === 'aperiodic' ? toSortedVideos(e.detail.items) : e.detail.items;
 			if (persist) {
-				updatePublishAts();
+				updateTracks();
 				track = $state.snapshot(_track);
 			}
 		};
@@ -50,24 +57,28 @@
 </script>
 
 <div class="track">
-	<div class="title">
-		{#if _track.kind === 'periodic'}
-			At <input type="datetime-local" bind:value={start.value} oninput={updatePublishAts} />, then
-			every
-			<input
-				type="number"
-				min="1"
-				max="14"
-				bind:value={_track.schedule.periodInDays}
-				oninput={updatePublishAts}
-				style="width: 32px"
-			/>
-			days
-		{:else if _track.kind === 'aperiodic'}
-			Aperiodic
-		{:else}
-			Unscheduled
-		{/if}
+	<div class="title-wrapper">
+		<div class="title">
+			{#if _track.kind === 'periodic'}
+				<input type="datetime-local" bind:value={start.value} oninput={updateTracks} /><br />
+				+ every
+				<input
+					type="number"
+					min="1"
+					max="14"
+					bind:value={_track.schedule.periodInDays}
+					oninput={updateTracks}
+					style="width: 32px"
+				/>
+				days
+			{:else if _track.kind === 'aperiodic'}
+				Aperiodic
+			{:else if _track.kind === 'new'}
+				New
+			{:else}
+				Unscheduled
+			{/if}
+		</div>
 	</div>
 	<ul
 		use:dndzone={{
@@ -102,7 +113,15 @@
 		object-fit: cover;
 	}
 	.track {
-		width: 400px;
+		min-width: 320px;
+		width: 450px;
+	}
+
+	.track .title-wrapper {
+		height: 40px;
+		display: flex;
+		flex-direction: row;
+		justify-content: center;
 	}
 
 	.video {

@@ -1,7 +1,14 @@
 <script lang="ts">
-	import { buildURL } from '$lib';
+	import { buildURL, range } from '$lib';
 	import { DateTime } from 'luxon';
-	import { fetchVideos, updateVideo, type Track, type Video, toSortedVideos } from './api';
+	import {
+		fetchVideos,
+		updateVideo,
+		type Track,
+		type Video,
+		toSortedVideos,
+		type Schedule
+	} from './api';
 	import TrackComponent from './TrackComponent.svelte';
 
 	let accessToken = $state<string>();
@@ -43,29 +50,95 @@
 		}
 	});
 
+	$inspect(tracks);
+
+	$effect(() => {
+		if (tracks.length > 2 && tracks.at(-1)?.kind !== 'new')
+			tracks.push({
+				kind: 'new',
+				videos: []
+			});
+		const validPredicate = (x: Track) => x.kind !== 'periodic' || x.videos.length > 0;
+		if (!tracks.every(validPredicate)) {
+			tracks = tracks.filter(validPredicate);
+		}
+	});
+
 	async function fetchVideosEffect() {
-		const _videos = await fetchVideos(accessToken!);
+		let _videos = await fetchVideos(accessToken!);
 		tracks = [
-			{ kind: 'unscheduled', videos: _videos.filter((x) => x.clientPublishAt === undefined) },
-			{
-				kind: 'aperiodic',
-				videos: toSortedVideos(_videos.filter((x) => x.clientPublishAt !== undefined))
-			}
+			{ kind: 'unscheduled', videos: _videos.filter((x) => x.clientPublishAt === undefined) }
 		];
+		_videos = toSortedVideos(_videos.filter((x) => x.clientPublishAt !== undefined));
+		while (true) {
+			const trackSuggestion = suggestTrack(_videos);
+			console.log(trackSuggestion);
+			if (
+				trackSuggestion === undefined ||
+				trackSuggestion.videos.length < (tracks.length === 1 ? 2 : 3)
+			) {
+				break;
+			}
+			tracks.push(trackSuggestion);
+			_videos = _videos.filter((x) => !trackSuggestion.videos.includes(x));
+		}
+		tracks.splice(1, 0, {
+			kind: 'aperiodic',
+			videos: _videos
+		});
 	}
 
-	function addTrack() {
-		tracks = [
-			...tracks,
-			{
-				kind: 'periodic',
-				videos: [],
-				schedule: {
-					periodInDays: 1,
-					start: DateTime.now().plus({ days: 100 })
+	function suggestTrack(videos: Video[]): Track | undefined {
+		const byTime = (Object as any).groupBy(videos, (x: Video) =>
+			x.clientPublishAt!.toLocaleString(DateTime.TIME_SIMPLE)
+		);
+		let maxLength = 1;
+		let maxSchedule: Schedule | undefined = undefined;
+		for (const [time, vids] of Object.entries(byTime) as [string, Video[]][]) {
+			for (const period of range(1, 14)) {
+				let currentStart = vids[0].serverPublishAt!;
+				let currentLength = 1;
+				vids.forEach((v, i) => {
+					if (i === 0) return;
+					if (
+						vids[i - 1].clientPublishAt!.plus({ days: period }).toMillis() ===
+						v.clientPublishAt!.toMillis()
+					) {
+						currentLength++;
+					} else {
+						if (currentLength > maxLength) {
+							maxLength = currentLength;
+							maxSchedule = {
+								start: currentStart,
+								periodInDays: period
+							};
+							currentStart = v.serverPublishAt!;
+							currentLength = 1;
+						}
+					}
+				});
+				if (currentLength > maxLength) {
+					maxLength = currentLength;
+					maxSchedule = {
+						start: currentStart,
+						periodInDays: period
+					};
 				}
 			}
-		];
+		}
+		if (maxSchedule === undefined) return undefined;
+		return {
+			kind: 'periodic',
+			schedule: maxSchedule,
+			videos: range(maxLength).map(
+				(i) =>
+					videos.find(
+						(v) =>
+							v.clientPublishAt!.toMillis() ===
+							maxSchedule!.start.plus({ days: i * maxSchedule!.periodInDays }).toMillis()
+					)!
+			)
+		};
 	}
 </script>
 
@@ -79,7 +152,6 @@
 			{#each tracks as _, i}
 				<TrackComponent bind:track={tracks[i]} />
 			{/each}
-			<div><button onclick={addTrack}>Add track</button></div>
 		</div>
 	{/await}
 {/if}

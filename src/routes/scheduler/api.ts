@@ -1,19 +1,25 @@
 import { buildURL } from '$lib';
 import { DateTime } from 'luxon';
 
-export type Track =
+export type TrackKind = 'unscheduled' | 'aperiodic' | 'new' | 'periodic';
+
+export type TrackAny =
 	| {
-			kind: 'unscheduled' | 'aperiodic';
+			kind: 'unscheduled' | 'aperiodic' | 'new';
 			videos: Video[];
 	  }
 	| {
 			kind: 'periodic';
 			videos: Video[];
-			schedule: {
-				start: DateTime;
-				periodInDays: number;
-			};
+			schedule: Schedule;
 	  };
+
+export type Track<Kind extends TrackKind = TrackKind> = TrackAny & { kind: Kind };
+
+export interface Schedule {
+	start: DateTime;
+	periodInDays: number;
+}
 
 export interface Video {
 	id: string;
