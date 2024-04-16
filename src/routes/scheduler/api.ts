@@ -53,7 +53,7 @@ export async function fetchAll(resource: string, opts: Record<string, string>) {
 	let pageToken = undefined;
 	const res: any[] = [];
 	while (true) {
-		let resp: any = await (
+		const resp: any = await (
 			await fetch(
 				buildURL(`https://www.googleapis.com/youtube/v3/${resource}`, {
 					...opts,

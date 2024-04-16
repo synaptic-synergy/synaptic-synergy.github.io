@@ -101,7 +101,7 @@
 		);
 		let maxLength = 1;
 		let maxSchedule: Schedule | undefined = undefined;
-		for (const [time, vids] of Object.entries(byTime) as [string, Video[]][]) {
+		for (const vids of Object.values(byTime) as Video[][]) {
 			for (const period of range(1, 14)) {
 				let currentStart = vids[0].serverPublishAt!;
 				let currentLength = 1;

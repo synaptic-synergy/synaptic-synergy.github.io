@@ -29,5 +29,19 @@ export default [
 	},
 	{
 		ignores: ['build/', '.svelte-kit/', 'package/']
+	},
+	{
+		rules: {
+			'@typescript-eslint/no-explicit-any': 'off',
+			'no-constant-condition': 'off',
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '_',
+					varsIgnorePattern: '_',
+					caughtErrorsIgnorePattern: '_'
+				}
+			]
+		}
 	}
 ];

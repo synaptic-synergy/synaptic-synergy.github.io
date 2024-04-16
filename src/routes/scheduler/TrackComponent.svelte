@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { DateTime } from 'luxon';
-	import { cloneTrack, formatDate, toSortedVideos, type Track } from './api';
+	import { formatDate, toSortedVideos, type Track } from './api';
 	import { dndzone } from 'svelte-dnd-action';
 
 	let { track = $bindable() }: { track: Track } = $props();
@@ -90,7 +90,7 @@
 	>
 		{#each _track.videos as video (video.id)}
 			<li class="video">
-				<img src={video.thumbnail} />
+				<img src={video.thumbnail} alt="Thumbnail of {video.name}." />
 				<div class="video-props">
 					<div class="title">{video.name}</div>
 					<div class="video-publishAt">{formatDate(video.clientPublishAt)}</div>
